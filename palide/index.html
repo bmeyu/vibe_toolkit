@@ -44,12 +44,11 @@
         .camera-img {
             width: 100%;
             display: block;
-            /* 给图片一点投影，增加立体感 */
-            filter: drop-shadow(10px 10px 20px rgba(0,0,0,0.4));
+            /* 给图片一点投影，增加立体感 - 调整向右下的阴影减少底部黑线 */
+            filter: drop-shadow(8px 5px 15px rgba(0,0,0,0.35));
             position: relative;
             z-index: 100; /* 保证图片在照片前面 */
             pointer-events: none; /* 让点击能穿透图片检测到下方的按钮(如果有) */
-            vertical-align: bottom; /* 防止图片底部出现间隙 */
         }
 
         /* --- 镜头区域 (视频) --- */
@@ -57,10 +56,10 @@
             position: absolute;
             /* 根据图片目测的百分比位置，如果歪了可以微调这里 */
             /* 自动检测 Gemini_Generated_Image_kjbox3kjbox3kjbo.png 得到的镜头圆心/尺寸 */
-            top: 28.99%;
-            left: 72.04%;
+            top: 59.11%;
+            left: 54.10%;
             transform: translate(-50%, -50%);
-            width: 11.50%; /* 镜头的直径占比 */
+            width: 41.57%; /* 镜头的直径占比 */
             aspect-ratio: 1 / 1; /* 保持正圆 */
             border-radius: 50%;
             overflow: hidden;
