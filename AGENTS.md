@@ -1,13 +1,12 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `palide/ai_studio_code-2.html`: Single-page experience containing inline HTML, CSS, and JavaScript for the Polaroid camera wall. Treat this as the source of truth when editing behavior or layout.
-- `palide/polaroid.jpg`: Camera shell artwork referenced by the page; keep the filename and relative path stable.
+- `palide/index.html`: Single-page experience containing inline HTML, CSS, and JavaScript for the Polaroid camera wall. Treat this as the source of truth when editing behavior or layout.
 - Remove platform artifacts like `palide/.DS_Store` before sharing or committing.
 
 ## Build, Test, and Development Commands
 - Static site—no build step. Open directly in a modern browser or serve locally to satisfy camera permissions:  
-  `cd palide && python -m http.server 8000` then visit `http://localhost:8000/ai_studio_code-2.html`.
+  `cd palide && python -m http.server 8000` then visit `http://localhost:8000/index.html`.
 - If you add new assets, keep them alongside the HTML or adjust relative paths accordingly.
 
 ## Coding Style & Naming Conventions
