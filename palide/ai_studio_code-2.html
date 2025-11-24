@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>真实感拍立得照片墙</title>
+    <style>
+        /* --- 基础设置 --- */
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #e8e0d5; /* 暖色基底 */
+            /* 贴合相机底图的米色点状纹理 */
+            background-image:
+                radial-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px),
+                radial-gradient(rgba(255, 255, 255, 0.45) 1px, transparent 1px);
+            background-size: 22px 22px, 22px 22px;
+            background-position: 0 0, 11px 11px;
+            overflow: hidden;
+            font-family: sans-serif;
+            user-select: none;
+        }
+
+        /* --- 相机容器 --- */
+        .camera-container {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            width: 320px; /* 相机显示宽度，可按需调整 */
+            height: auto;
+            z-index: 1000;
+        }
+
+        /* 相对定位包裹层，用于定位镜头和按钮 */
+        .camera-wrapper {
+            position: relative;
+            width: 100%;
+            /* 这里的宽高比例大概基于你的图片，让图片撑开高度即可 */
+        }
+
+        /* 相机背景图 */
+        .camera-img {
+            width: 100%;
+            display: block;
+            /* 给图片一点投影，增加立体感 */
+            filter: drop-shadow(10px 10px 20px rgba(0,0,0,0.4)); 
+            position: relative;
+            z-index: 100; /* 保证图片在照片前面 */
+            pointer-events: none; /* 让点击能穿透图片检测到下方的按钮(如果有) */
+        }
+
+        /* --- 镜头区域 (视频) --- */
+        .lens-video-mask {
+            position: absolute;
+            /* 根据图片目测的百分比位置，如果歪了可以微调这里 */
+            /* 自动检测 Gemini_Generated_Image_kbixe3kbixe3kbix.png 得到的镜头圆心/尺寸 */
+            top: 56.2%; 
+            left: 61.6%;
+            transform: translate(-50%, -50%);
+            width: 45.3%; /* 镜头的直径占比 */
+            aspect-ratio: 1 / 1; /* 保持正圆 */
+            border-radius: 50%;
+            overflow: hidden;
+            z-index: 101; /* 在相机图之上 */
+            background: transparent; /* 透明以显示相机贴图，不覆盖为黑圈 */
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8); /* 内阴影模拟镜头深邃感 */
+            border: 2px solid #222;
+            opacity: 0; /* 默认隐藏，待视频可用时显示 */
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        video#camera-stream {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* 镜像 */
+            opacity: 0; /* 默认隐藏，待流开启后淡入 */
+            transition: opacity 0.3s ease;
+        }
+
+        /* 摄像头就绪后淡入，避免纯黑占位 */
+        video#camera-stream.is-live {
+            opacity: 0.9; /* 稍微暗一点点，像在镜头里 */
+        }
+
+        .lens-video-mask.live {
+            opacity: 1;
+        }
+
+        /* 镜头反光效果 (可选) */
+        .lens-reflection {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 20%);
+            pointer-events: none;
+            z-index: 102;
+        }
+
+        /* --- 快门按钮 (透明点击区) --- */
+        .shutter-trigger {
+            position: absolute;
+            /* 根据图片目测的红色按钮位置 */
+            top: 47%;
+            left: 18%;
+            width: 13%;
+            height: 13%;
+            border-radius: 50%;
+            z-index: 105; /* 最上层 */
+            cursor: pointer;
+            /* background: rgba(255, 0, 0, 0.3); /* 调试时打开这个看位置 */
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .shutter-trigger:active {
+            transform: scale(0.95);
+        }
+
+        /* --- 闪光灯区域 --- */
+        .flash-bulb {
+            position: absolute;
+            top: 32%;
+            left: 15%;
+            width: 18%;
+            height: 18%;
+            border-radius: 50%;
+            z-index: 105;
+            pointer-events: none;
+            background: white;
+            opacity: 0;
+            box-shadow: 0 0 20px 10px white;
+            transition: opacity 0.1s;
+        }
+
+        /* --- 照片样式 --- */
+        .polaroid-photo {
+            position: absolute;
+            width: 200px; /* 照片宽度 */
+            height: 240px;
+            background: white;
+            padding: 12px 12px 45px 12px;
+            box-shadow: 2px 2px 15px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            z-index: 50; /* 初始在相机后面 */
+            cursor: grab;
+            /* 纸质纹理 */
+            background-image: radial-gradient(#f8f8f8 1px, transparent 1px);
+            background-size: 5px 5px;
+        }
+        
+        .polaroid-photo img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background: #1a1a1a;
+            pointer-events: none;
+        }
+
+        /* 显影动画类 */
+        .polaroid-photo.developing img {
+            filter: blur(20px) brightness(0.1) sepia(1);
+        }
+        
+        .polaroid-photo.developed img {
+            filter: blur(0) brightness(1) sepia(0.2);
+            transition: filter 5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .polaroid-photo:active {
+            cursor: grabbing;
+            z-index: 2000 !important;
+        }
+
+        /* 全屏大闪光 */
+        .screen-flash {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 9999;
+            transition: opacity 0.1s;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 全屏闪光层 -->
+    <div class="screen-flash" id="screen-flash"></div>
+
+    <div class="camera-container" id="camera-ui">
+        <div class="camera-wrapper">
+            <!-- 1. 闪光灯发光点 -->
+            <div class="flash-bulb" id="camera-flash"></div>
+
+            <!-- 2. 摄像头 (位于图片下方/或者中间层，通过遮罩显示圆形) -->
+            <div class="lens-video-mask">
+                <video id="camera-stream" autoplay playsinline></video>
+                <div class="lens-reflection"></div>
+            </div>
+
+            <!-- 3. 相机图片 -->
+            <img src="Gemini_Generated_Image_kbixe3kbixe3kbix.png" alt="Polaroid Camera" class="camera-img">
+
+            <!-- 4. 透明快门按钮 -->
+            <div class="shutter-trigger" id="shutter-btn" title="点击拍照"></div>
+        </div>
+        
+        <!-- 截图用画布 -->
+        <canvas id="capture-canvas" style="display:none;"></canvas>
+    </div>
+
+    <script>
+        const video = document.getElementById('camera-stream');
+        const canvas = document.getElementById('capture-canvas');
+        const shutterBtn = document.getElementById('shutter-btn');
+        const cameraUI = document.getElementById('camera-ui');
+        const cameraFlash = document.getElementById('camera-flash');
+        const screenFlash = document.getElementById('screen-flash');
+        const lensMask = document.querySelector('.lens-video-mask');
+
+        // 初始化摄像头
+        async function initCamera() {
+            try {
+                // 在 Safari 上严格的分辨率可能触发 OverconstrainedError，使用宽松约束
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user" }
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error("无法访问摄像头", err);
+                if (err.name === "OverconstrainedError" || err.name === "ConstraintNotSatisfiedError") {
+                    alert("摄像头约束不被支持，尝试重新请求默认摄像头。");
+                    try {
+                        const fallback = await navigator.mediaDevices.getUserMedia({ video: true });
+                        video.srcObject = fallback;
+                        return;
+                    } catch (err2) {
+                        console.error("备用请求失败", err2);
+                    }
+                }
+                alert("无法访问摄像头，请在 Safari 的 网站设置/系统偏好中允许摄像头，并刷新重试。");
+            }
+        }
+
+        initCamera();
+
+        let isStreamReady = false;
+
+        // 视频流就绪后再显示，避免镜头位置出现黑色占位
+        video.addEventListener('canplay', () => {
+            video.classList.add('is-live');
+            lensMask.classList.add('live');
+            isStreamReady = true;
+        });
+
+        // 拍照点击事件
+        shutterBtn.addEventListener('click', () => {
+            if (!isStreamReady || !video.videoWidth || !video.videoHeight) {
+                alert("摄像头还没就绪，请允许权限或稍等 1 秒再试。");
+                return;
+            }
+
+            triggerFlash();
+            
+            const context = canvas.getContext('2d');
+            // 截取视频中心部分以匹配正方形照片
+            const size = Math.min(video.videoWidth, video.videoHeight);
+            const startX = (video.videoWidth - size) / 2;
+            const startY = (video.videoHeight - size) / 2;
+
+            canvas.width = size;
+            canvas.height = size;
+            
+            // 重置变换，绘制并水平翻转
+            context.setTransform(1, 0, 0, 1, 0, 0);
+            context.translate(size, 0);
+            context.scale(-1, 1);
+            context.drawImage(video, startX, startY, size, size, 0, 0, size, size);
+            
+            const imgUrl = canvas.toDataURL('image/jpeg', 0.9);
+            createAndEjectPhoto(imgUrl);
+        });
+
+        function triggerFlash() {
+            // 相机上的小闪光灯
+            cameraFlash.style.opacity = 1;
+            // 全屏大闪光
+            screenFlash.style.opacity = 0.6;
+            
+            setTimeout(() => {
+                cameraFlash.style.opacity = 0;
+                screenFlash.style.opacity = 0;
+            }, 150);
+        }
+
+        function createAndEjectPhoto(imgUrl) {
+            const photo = document.createElement('div');
+            photo.classList.add('polaroid-photo');
+            photo.classList.add('developing');
+
+            const img = document.createElement('img');
+            img.src = imgUrl;
+            img.draggable = false;
+            photo.appendChild(img);
+            
+            document.body.appendChild(photo);
+
+            // 计算初始位置
+            const cameraRect = cameraUI.getBoundingClientRect();
+            
+            // 这里的计算是为了让照片看起来是从相机背面中间弹出来的
+            // 宽度居中
+            const startLeft = cameraRect.left + (cameraRect.width - 200) / 2; 
+            // 高度：稍微露出一点头，在相机后面
+            const startTop = cameraRect.top + 50; 
+
+            photo.style.left = `${startLeft}px`;
+            photo.style.top = `${startTop}px`;
+            photo.style.zIndex = 50; // 在相机(100)后面
+
+            // 强制重绘
+            photo.offsetHeight;
+
+            // 弹出动画：向上移动
+            const endTop = startTop - 220;
+            photo.style.transition = 'top 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            photo.style.top = `${endTop}px`;
+
+            // 动画结束后显影并允许交互
+            setTimeout(() => {
+                photo.classList.remove('developing');
+                photo.classList.add('developed');
+                
+                // 允许盖住相机
+                photo.style.zIndex = 110;
+                
+                // 随机微小角度
+                const randomRotate = (Math.random() - 0.5) * 15;
+                photo.style.transform = `rotate(${randomRotate}deg)`;
+                photo.style.transition = 'transform 0.3s, filter 0.3s';
+                
+                enableDrag(photo);
+            }, 1300);
+        }
+
+        // 拖拽逻辑
+        let maxZIndex = 200;
+        function enableDrag(el) {
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            el.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                const rect = el.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+                
+                maxZIndex++;
+                el.style.zIndex = maxZIndex;
+                el.style.cursor = 'grabbing';
+                el.style.transition = 'none'; // 拖动时去掉过渡，避免延迟感
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                el.style.left = `${initialLeft + dx}px`;
+                el.style.top = `${initialTop + dy}px`;
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    el.style.cursor = 'grab';
+                    el.style.transition = 'transform 0.2s'; // 恢复过渡
+                }
+            });
+        }
+    </script>
+</body>
+</html>
