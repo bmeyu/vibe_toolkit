@@ -1,0 +1,7 @@
+{
+  "name": "Van Gogh Particle Dreams",
+  "description": "An interactive WebGL experience transforming Van Gogh masterpieces into flowing particle systems controlled by hand gestures.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
