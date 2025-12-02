@@ -18,7 +18,7 @@ export const RainyCanvas: React.FC = () => {
       const numDrops = 300;
 
       // Natural stacking system
-      let stackedChars: StackedChar[] = [];
+      let stackedWords: StackedWord[] = [];
       let heightMap: number[] = []; // Height at each x position
       const GRID_SIZE = 15; // Pixel grid for height tracking (larger for better stacking)
 
@@ -40,11 +40,12 @@ export const RainyCanvas: React.FC = () => {
       const butterflyColor = p.color(255, 200, 80);
 
       // Interfaces
-      interface StackedChar {
+      interface StackedWord {
         x: number;
         y: number;
-        char: string;
+        word: string;        // Changed from char to word
         size: number;
+        rotation: number;    // Rotation angle in radians
         alpha: number;
         targetAlpha: number;
         glowPhase: number;
@@ -170,7 +171,7 @@ export const RainyCanvas: React.FC = () => {
 
       // Check if drop should stack
       function checkStacking(drop: RainDrop): boolean {
-        if (!drop.char) return false;
+        if (!drop.word) return false;
 
         const gridX = Math.floor(drop.x / GRID_SIZE);
         if (gridX < 0 || gridX >= heightMap.length) return false;
@@ -179,30 +180,34 @@ export const RainyCanvas: React.FC = () => {
 
         // Check if drop reached stacking height (larger detection range)
         if (drop.y >= currentHeight - 15) {
-          // Add to stacked chars
-          const jitterX = p.random(-3, 3);
-          const jitterY = p.random(-2, 2);
+          // Random jitter for natural scatter
+          const jitterX = p.random(-8, 8);
+          const jitterY = p.random(-3, 3);
 
-          stackedChars.push({
+          // Random rotation: ±15 degrees (convert to radians)
+          const rotation = p.random(-0.26, 0.26); // ~±15°
+
+          stackedWords.push({
             x: drop.x + jitterX,
             y: currentHeight + jitterY,
-            char: drop.char,
-            size: drop.textSize * 0.9, // Keep size closer to original
-            alpha: 200, // Brighter for visibility
+            word: drop.word,  // Store complete word
+            size: drop.textSize,  // Keep original size variation (6-12px)
+            rotation: rotation,
+            alpha: 200,
             targetAlpha: 200,
             glowPhase: p.random(p.TWO_PI)
           });
 
-          // Update height map - also update neighboring cells for wider stacking
-          const charHeight = drop.textSize * 0.9;
-          heightMap[gridX] -= charHeight;
+          // Update height map
+          const wordHeight = drop.textSize * 1.2;
+          heightMap[gridX] -= wordHeight;
 
           // Update adjacent cells for smoother mountain shape
           if (gridX > 0) {
-            heightMap[gridX - 1] -= charHeight * 0.5;
+            heightMap[gridX - 1] -= wordHeight * 0.4;
           }
           if (gridX < heightMap.length - 1) {
-            heightMap[gridX + 1] -= charHeight * 0.5;
+            heightMap[gridX + 1] -= wordHeight * 0.4;
           }
 
           return true;
@@ -211,33 +216,38 @@ export const RainyCanvas: React.FC = () => {
         return false;
       }
 
-      // Draw stacked characters
-      function drawStackedChars() {
-        p.textAlign(p.CENTER, p.BOTTOM);
-
-        for (const char of stackedChars) {
+      // Draw stacked words (with rotation)
+      function drawStackedWords() {
+        for (const item of stackedWords) {
           // Update glow
-          char.glowPhase += 0.02;
-          const glow = p.sin(char.glowPhase) * 0.15 + 0.85;
+          item.glowPhase += 0.02;
+          const glow = p.sin(item.glowPhase) * 0.15 + 0.85;
 
           // Fade towards target
-          if (Math.abs(char.alpha - char.targetAlpha) > 1) {
-            char.alpha += (char.targetAlpha - char.alpha) * 0.05;
+          if (Math.abs(item.alpha - item.targetAlpha) > 1) {
+            item.alpha += (item.targetAlpha - item.alpha) * 0.05;
           }
 
-          if (char.alpha > 0) {
+          if (item.alpha > 0) {
+            p.push();
+            p.translate(item.x, item.y);
+            p.rotate(item.rotation);  // Apply rotation
+
             p.noStroke();
             p.fill(stackedColor.levels[0], stackedColor.levels[1],
-                   stackedColor.levels[2], char.alpha * glow);
-            p.textSize(char.size);
-            p.text(char.char, char.x, char.y);
+                   stackedColor.levels[2], item.alpha * glow);
+            p.textSize(item.size);
+            p.textAlign(p.CENTER, p.BOTTOM);
+            p.text(item.word, 0, 0);  // Draw at origin (already translated)
+
+            p.pop();
           }
         }
 
-        // Remove fully faded chars
-        for (let i = stackedChars.length - 1; i >= 0; i--) {
-          if (stackedChars[i].alpha <= 1) {
-            stackedChars.splice(i, 1);
+        // Remove fully faded words
+        for (let i = stackedWords.length - 1; i >= 0; i--) {
+          if (stackedWords[i].alpha <= 1) {
+            stackedWords.splice(i, 1);
           }
         }
       }
@@ -252,18 +262,18 @@ export const RainyCanvas: React.FC = () => {
 
       // Spawn butterflies gradually
       function spawnButterfly() {
-        if (stackedChars.length === 0) return;
+        if (stackedWords.length === 0) return;
 
-        // Pick random stacked char
-        const charIndex = Math.floor(p.random(stackedChars.length));
-        const char = stackedChars[charIndex];
+        // Pick random stacked word
+        const wordIndex = Math.floor(p.random(stackedWords.length));
+        const item = stackedWords[wordIndex];
 
         const angle = p.random(p.TWO_PI);
         const speed = p.random(1, 3);
 
         butterflies.push({
-          x: char.x,
-          y: char.y,
+          x: item.x,
+          y: item.y,
           vx: p.cos(angle) * speed,
           vy: p.sin(angle) * speed - 1, // Bias upward
           wingPhase: p.random(p.TWO_PI),
@@ -345,8 +355,15 @@ export const RainyCanvas: React.FC = () => {
 
         switch(phase) {
           case 'raining':
-            // Draw stacked chars first (background)
-            drawStackedChars();
+            // Ensure clean start on first frame
+            if (rainingTimer <= 0) {
+              stackedWords = []; // Force clear
+              rainingTimer++;
+              break; // Skip all drawing on first frame for clean slate
+            }
+
+            // Draw stacked words first (background)
+            drawStackedWords();
 
             // Update and display rain drops
             for (let drop of drops) {
@@ -357,24 +374,16 @@ export const RainyCanvas: React.FC = () => {
             // Increment timer
             rainingTimer++;
 
-            // Debug: Log timer every second
-            if (rainingTimer % 60 === 0) {
-              console.log(`Raining timer: ${rainingTimer} frames (${rainingTimer/60} seconds)`);
-              console.log(`Current phase: ${phase}`);
-              console.log(`Stacked chars: ${stackedChars.length}`);
-            }
-
             // Check if should stop (10 seconds = 600 frames at 60fps, OR height threshold)
             if (rainingTimer >= 600 || checkStopRain()) {
-              console.log(`STOPPING RAIN - Timer: ${rainingTimer}, Height check: ${checkStopRain()}`);
               phase = 'stopping';
               stoppingTimer = 0;
             }
             break;
 
           case 'stopping':
-            // Draw stacked chars
-            drawStackedChars();
+            // Draw stacked words
+            drawStackedWords();
 
             // Continue updating existing drops
             for (let drop of drops) {
@@ -388,13 +397,7 @@ export const RainyCanvas: React.FC = () => {
             stoppingTimer++;
             const allDropsGone = drops.every(d => d.y > p.height + 50 || d.y < -100);
 
-            // Debug
-            if (stoppingTimer % 30 === 0) {
-              console.log(`STOPPING phase - Timer: ${stoppingTimer}, All drops gone: ${allDropsGone}`);
-            }
-
             if (allDropsGone && stoppingTimer > 30) { // Wait 30 frames after clear
-              console.log(`ENTERING BUTTERFLIES PHASE`);
               phase = 'butterflies';
               butterflySpawnRate = 0.005;
               butterflyTimer = 0;
@@ -402,24 +405,19 @@ export const RainyCanvas: React.FC = () => {
             break;
 
           case 'butterflies':
-            // Draw stacked chars (fading)
-            drawStackedChars();
+            // Draw stacked words (fading)
+            drawStackedWords();
 
-            // Gradually fade all stacked chars
-            for (const char of stackedChars) {
-              char.targetAlpha -= 0.5;
+            // Gradually fade all stacked words
+            for (const item of stackedWords) {
+              item.targetAlpha -= 0.5;
             }
 
             // Spawn butterflies with acceleration
             butterflyTimer++;
             butterflySpawnRate *= 1.03; // Accelerate spawn rate
 
-            // Debug
-            if (butterflyTimer % 60 === 0) {
-              console.log(`BUTTERFLIES phase - Timer: ${butterflyTimer}, Spawn rate: ${butterflySpawnRate.toFixed(4)}, Butterflies: ${butterflies.length}, Stacked: ${stackedChars.length}`);
-            }
-
-            if (p.random() < butterflySpawnRate && stackedChars.length > 0) {
+            if (p.random() < butterflySpawnRate && stackedWords.length > 0) {
               spawnButterfly();
             }
 
@@ -429,32 +427,20 @@ export const RainyCanvas: React.FC = () => {
               drawButterfly(b);
             }
 
-            // Transition to resetting when chars and butterflies gone
-            if (stackedChars.length === 0 && butterflies.length === 0 && butterflyTimer > 180) {
-              console.log(`ENTERING RESETTING PHASE`);
-              phase = 'resetting';
-              // Clear everything immediately when entering resetting phase
-              stackedChars = [];
-              initHeightMap();
-            }
-            break;
-
-          case 'resetting':
-            // Gradually restore rain drops
-            let allRestored = true;
-            for (let drop of drops) {
-              drop.update();
-              if (drop.alpha < p.map(drop.z, 0.5, 2, 120, 255)) {
-                drop.alpha = p.min(drop.alpha + 3, p.map(drop.z, 0.5, 2, 120, 255));
-                allRestored = false;
+            // Transition to resetting when words and butterflies gone
+            if (stackedWords.length === 0 && butterflies.length === 0 && butterflyTimer > 180) {
+              // Simple solution: Reset everything from scratch
+              drops = [];
+              for (let i = 0; i < numDrops; i++) {
+                drops.push(new RainDrop());
               }
-              drop.display();
-            }
-
-            // When all drops restored, return to raining
-            if (allRestored) {
+              stackedWords = [];
+              butterflies = [];
+              initHeightMap();
               phase = 'raining';
-              rainingTimer = 0; // Reset timer
+              rainingTimer = 0;
+              butterflyTimer = 0;
+              butterflySpawnRate = 0;
             }
             break;
         }
