@@ -1,0 +1,5 @@
+{
+  "name": "Rainy Macondo",
+  "description": "A generative art piece simulating a melancholic rainy window looking out onto text from One Hundred Years of Solitude, using p5.js and GLSL shaders.",
+  "requestFramePermissions": []
+}
