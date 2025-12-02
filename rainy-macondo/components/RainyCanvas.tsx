@@ -11,41 +11,43 @@ export const RainyCanvas: React.FC = () => {
 
     const sketch = (p: p5) => {
       const sourceText = "MACONDOWASRAINING";
+      const TEXT = "MACONDO WAS RAINING";
+      const WORDS = ["MACONDO", "WAS", "RAINING", "RAIN", "WATER", "TIME", "MEMORY"];
       let charArray: string[] = [];
       let drops: RainDrop[] = [];
       const numDrops = 300;
 
-      // Grid system
-      const TEXT = "MACONDO WAS RAINING";
-      const CHAR_WIDTH = 20;
-      const CHAR_HEIGHT = 24;
-      let grid: GridCell[][] = [];
-      let ROWS = 0;
+      // Natural stacking system
+      let stackedChars: StackedChar[] = [];
+      let heightMap: number[] = []; // Height at each x position
+      const GRID_SIZE = 5; // Pixel grid for height tracking
 
       // Butterflies
       let butterflies: Butterfly[] = [];
+      let butterflySpawnRate = 0;
+      let butterflyTimer = 0;
 
       // Phase management
-      type Phase = 'raining' | 'transforming' | 'resetting';
+      type Phase = 'raining' | 'stopping' | 'butterflies' | 'resetting';
       let phase: Phase = 'raining';
+      let stoppingTimer = 0;
+      let rainingTimer = 0; // Timer for automatic rain stop
 
       // Theme colors
       const bgColor = p.color(20, 30, 50);
       const rainColor = p.color(180, 200, 220);
-      const butterflyColor = p.color(255, 200, 80); // Gold
+      const stackedColor = p.color(140, 160, 180); // Darker for stacked
+      const butterflyColor = p.color(255, 200, 80);
 
       // Interfaces
-      interface GridCell {
+      interface StackedChar {
         x: number;
         y: number;
         char: string;
-        row: number;
-        col: number;
-        lit: boolean;
-        brightness: number;
+        size: number;
+        alpha: number;
+        targetAlpha: number;
         glowPhase: number;
-        jitterX: number;  // Random offset for natural look
-        jitterY: number;
       }
 
       interface Butterfly {
@@ -59,7 +61,7 @@ export const RainyCanvas: React.FC = () => {
         alpha: number;
       }
 
-      // Gaussian random number generator (Box-Muller transform)
+      // Gaussian random number generator
       function gaussianRandom(mean: number, stdDev: number): number {
         const u1 = p.random();
         const u2 = p.random();
@@ -73,219 +75,192 @@ export const RainyCanvas: React.FC = () => {
         z: number;
         speed: number;
         textSize: number;
-        char: string;
+        word: string; // Changed from char to word
         alpha: number;
 
         constructor(startRandomY = true) {
-          // Use Gaussian distribution for x position (center-weighted)
+          // Gaussian distribution for center-weighted position
           this.x = gaussianRandom(p.width / 2, p.width / 4);
           this.x = p.constrain(this.x, 0, p.width);
 
           this.y = startRandomY ? p.random(-p.height, p.height) : p.random(-500, -50);
           this.z = p.random(0.5, 2);
 
-          // Add random speed variation
+          // Random speed variation
           const baseSpeed = p.map(this.z, 0.5, 2, 1, 3.5);
           this.speed = baseSpeed * p.random(0.7, 1.3);
 
-          this.textSize = p.map(this.z, 0.5, 2, 10, 24); // Reduced from 12-28 to 10-24
+          // Smaller text size
+          this.textSize = p.map(this.z, 0.5, 2, 6, 12); // Reduced from 10-24 to 6-12
           this.alpha = p.map(this.z, 0.5, 2, 120, 255);
-          this.pickChar();
+          this.pickWord();
         }
 
-        pickChar() {
-          const randomIndex = Math.floor(p.random(charArray.length));
-          this.char = charArray[randomIndex];
-          if (p.random(1) > 0.85) {
-            this.char = "";
+        pickWord() {
+          // Pick a random word
+          const randomIndex = Math.floor(p.random(WORDS.length));
+          this.word = WORDS[randomIndex];
+          // Occasionally show empty
+          if (p.random(1) > 0.9) {
+            this.word = "";
           }
+        }
+
+        // Get first character for stacking
+        get char(): string {
+          return this.word.length > 0 ? this.word[0] : '';
         }
 
         update() {
           this.y += this.speed;
 
-          // Check for grid match in raining phase
-          if (phase === 'raining' && this.char) {
-            if (checkMatch(this)) {
+          // Check for stacking (only in raining phase)
+          if (phase === 'raining' && this.y > p.height - 100) {
+            if (checkStacking(this)) {
               this.reset();
               return;
             }
           }
 
-          // Reset when reaching bottom
-          if (this.y > p.height + 50) {
+          // Reset when off screen (only in raining phase)
+          if (phase === 'raining' && this.y > p.height + 50) {
             this.reset();
           }
         }
 
         reset() {
           this.y = p.random(-200, -50);
-          // Use Gaussian distribution for reset position too
           this.x = gaussianRandom(p.width / 2, p.width / 4);
           this.x = p.constrain(this.x, 0, p.width);
-          this.pickChar();
+          this.pickWord();
         }
 
         display() {
-          // Draw tail
-          const tailLength = p.map(this.z, 0.5, 2, 80, 180);
+          if (!this.word) return;
+
+          // Draw tail (shorter for smaller text)
+          const tailLength = p.map(this.z, 0.5, 2, 40, 90); // Reduced from 80-180
           p.stroke(rainColor.levels[0], rainColor.levels[1], rainColor.levels[2], this.alpha * 0.4);
-          p.strokeWeight(p.map(this.z, 0.5, 2, 0.5, 1.5));
+          p.strokeWeight(p.map(this.z, 0.5, 2, 0.3, 1));
           p.line(this.x, this.y - tailLength, this.x, this.y);
 
-          // Draw character
+          // Draw word vertically
           p.noStroke();
           p.fill(rainColor.levels[0], rainColor.levels[1], rainColor.levels[2], this.alpha);
           p.textSize(this.textSize);
-          p.textAlign(p.CENTER, p.BOTTOM);
-          p.text(this.char, this.x, this.y);
+          p.textAlign(p.CENTER, p.TOP);
+
+          // Draw each character vertically
+          for (let i = 0; i < this.word.length; i++) {
+            const charY = this.y + i * this.textSize * 1.2; // 1.2 for line spacing
+            p.text(this.word[i], this.x, charY);
+          }
         }
       }
 
-      // Create grid
-      function createGrid() {
-        grid = [];
-        ROWS = Math.floor((p.height * 2/3) / CHAR_HEIGHT);
-        const startX = (p.width - TEXT.length * CHAR_WIDTH) / 2;
-
-        for (let row = 0; row < ROWS; row++) {
-          const rowCells: GridCell[] = [];
-          const y = p.height - (row + 1) * CHAR_HEIGHT;
-
-          for (let col = 0; col < TEXT.length; col++) {
-            const x = startX + col * CHAR_WIDTH;
-            rowCells.push({
-              x, y,
-              char: TEXT[col],
-              row, col,
-              lit: false,
-              brightness: 0,
-              glowPhase: p.random(p.TWO_PI),
-              jitterX: p.random(-2, 2),  // Random horizontal offset
-              jitterY: p.random(-1, 1)   // Random vertical offset
-            });
-          }
-          grid.push(rowCells);
+      // Initialize height map
+      function initHeightMap() {
+        heightMap = [];
+        const mapWidth = Math.ceil(p.width / GRID_SIZE);
+        for (let i = 0; i < mapWidth; i++) {
+          heightMap[i] = p.height;
         }
       }
 
-      // Check if drop matches grid cell
-      function checkMatch(drop: RainDrop): boolean {
-        if (!grid.length) return false;
+      // Check if drop should stack
+      function checkStacking(drop: RainDrop): boolean {
+        if (!drop.char) return false;
 
-        // Check if in grid area
-        if (drop.y < p.height - ROWS * CHAR_HEIGHT) return false;
+        const gridX = Math.floor(drop.x / GRID_SIZE);
+        if (gridX < 0 || gridX >= heightMap.length) return false;
 
-        // Find row
-        const row = Math.floor((p.height - drop.y) / CHAR_HEIGHT);
-        if (row < 0 || row >= ROWS) return false;
+        const currentHeight = heightMap[gridX];
 
-        // Find matching cell in row
-        for (const cell of grid[row]) {
-          if (!cell.lit && cell.char === drop.char) {
-            // Check if we can light this cell (bottom row or row below is lit)
-            if (row === 0) {
-              // Bottom row - always can light
-              cell.lit = true;
-              return true;
-            } else {
-              // Check if same column in row below is lit
-              const cellBelow = grid[row - 1][cell.col];
-              if (cellBelow.lit) {
-                cell.lit = true;
-                return true;
-              }
-            }
-          }
+        // Check if drop reached stacking height
+        if (drop.y >= currentHeight - 5) {
+          // Add to stacked chars
+          const jitterX = p.random(-2, 2);
+          const jitterY = p.random(-1, 1);
+
+          stackedChars.push({
+            x: drop.x + jitterX,
+            y: currentHeight + jitterY,
+            char: drop.char,
+            size: drop.textSize * 0.7,
+            alpha: 150,
+            targetAlpha: 150,
+            glowPhase: p.random(p.TWO_PI)
+          });
+
+          // Update height map
+          heightMap[gridX] -= drop.textSize * 0.7;
+
+          return true;
         }
+
         return false;
       }
 
-      // Draw grid
-      function drawGrid() {
-        p.textFont('Georgia');
+      // Draw stacked characters
+      function drawStackedChars() {
         p.textAlign(p.CENTER, p.BOTTOM);
 
-        // Soaked (stacked) text color - darker than falling rain
-        const soakedColor = p.color(140, 160, 180);
+        for (const char of stackedChars) {
+          // Update glow
+          char.glowPhase += 0.02;
+          const glow = p.sin(char.glowPhase) * 0.15 + 0.85;
 
-        for (const row of grid) {
-          for (const cell of row) {
-            // Update brightness
-            if (cell.lit && cell.brightness < 1) {
-              cell.brightness = p.min(cell.brightness + 0.05, 1);
-            }
+          // Fade towards target
+          if (Math.abs(char.alpha - char.targetAlpha) > 1) {
+            char.alpha += (char.targetAlpha - char.alpha) * 0.05;
+          }
 
-            if (cell.brightness > 0) {
-              // Glow effect
-              cell.glowPhase += 0.02;
-              const glow = p.sin(cell.glowPhase) * 0.15 + 0.85;
+          if (char.alpha > 0) {
+            p.noStroke();
+            p.fill(stackedColor.levels[0], stackedColor.levels[1],
+                   stackedColor.levels[2], char.alpha * glow);
+            p.textSize(char.size);
+            p.text(char.char, char.x, char.y);
+          }
+        }
 
-              // Reduced opacity for soaked/old text (40-60%)
-              const alpha = cell.brightness * 150 * glow;
-
-              p.noStroke();
-              p.fill(soakedColor.levels[0], soakedColor.levels[1], soakedColor.levels[2], alpha);
-              p.textSize(16); // Reduced from 18 to 16
-
-              // Apply jitter offset for organic look
-              p.text(cell.char, cell.x + cell.jitterX, cell.y + cell.jitterY);
-            }
+        // Remove fully faded chars
+        for (let i = stackedChars.length - 1; i >= 0; i--) {
+          if (stackedChars[i].alpha <= 1) {
+            stackedChars.splice(i, 1);
           }
         }
       }
 
-      // Check if ready to transform
-      function checkTransformReady(): boolean {
-        if (!grid.length) return false;
-
-        // Count total lit cells
-        let totalCells = 0;
-        let litCells = 0;
-
-        for (const row of grid) {
-          for (const cell of row) {
-            totalCells++;
-            if (cell.lit) litCells++;
-          }
-        }
-
-        // Transform when 2/3 of grid is lit
-        const threshold = totalCells * 0.67;
-        return litCells >= threshold;
+      // Check if ready to stop rain
+      function checkStopRain(): boolean {
+        // Get max stack height
+        const minHeight = Math.min(...heightMap);
+        const stackHeight = p.height - minHeight;
+        return stackHeight >= p.height * 0.25; // Stop when quarter screen filled (faster)
       }
 
-      // Transform grid to butterflies
-      function transformToButterflies() {
-        butterflies = [];
+      // Spawn butterflies gradually
+      function spawnButterfly() {
+        if (stackedChars.length === 0) return;
 
-        for (const row of grid) {
-          for (const cell of row) {
-            if (cell.lit) {
-              const angle = p.random(p.TWO_PI);
-              const speed = p.random(1, 3);
+        // Pick random stacked char
+        const charIndex = Math.floor(p.random(stackedChars.length));
+        const char = stackedChars[charIndex];
 
-              butterflies.push({
-                x: cell.x,
-                y: cell.y,
-                vx: p.cos(angle) * speed,
-                vy: p.sin(angle) * speed - 1, // Bias upward
-                wingPhase: p.random(p.TWO_PI),
-                wingSpeed: p.random(0.1, 0.2),
-                size: p.random(12, 20),
-                alpha: 255
-              });
-            }
-          }
-        }
+        const angle = p.random(p.TWO_PI);
+        const speed = p.random(1, 3);
 
-        // Reset grid
-        for (const row of grid) {
-          for (const cell of row) {
-            cell.lit = false;
-            cell.brightness = 0;
-          }
-        }
+        butterflies.push({
+          x: char.x,
+          y: char.y,
+          vx: p.cos(angle) * speed,
+          vy: p.sin(angle) * speed - 1, // Bias upward
+          wingPhase: p.random(p.TWO_PI),
+          wingSpeed: p.random(0.1, 0.2),
+          size: p.random(12, 20),
+          alpha: 255
+        });
       }
 
       // Update butterflies
@@ -293,15 +268,11 @@ export const RainyCanvas: React.FC = () => {
         for (let i = butterflies.length - 1; i >= 0; i--) {
           const b = butterflies[i];
 
-          // Update position
           b.x += b.vx;
           b.y += b.vy;
           b.wingPhase += b.wingSpeed;
-
-          // Fade out
           b.alpha -= 1;
 
-          // Remove if faded
           if (b.alpha <= 0 || b.y < -50 || b.x < -50 || b.x > p.width + 50) {
             butterflies.splice(i, 1);
           }
@@ -318,7 +289,8 @@ export const RainyCanvas: React.FC = () => {
         // Left wing
         p.push();
         p.rotate(-wingAngle);
-        p.fill(butterflyColor.levels[0], butterflyColor.levels[1], butterflyColor.levels[2], b.alpha);
+        p.fill(butterflyColor.levels[0], butterflyColor.levels[1],
+               butterflyColor.levels[2], b.alpha);
         p.noStroke();
         p.ellipse(-b.size * 0.3, 0, b.size, b.size * 0.6);
         p.pop();
@@ -326,7 +298,8 @@ export const RainyCanvas: React.FC = () => {
         // Right wing
         p.push();
         p.rotate(wingAngle);
-        p.fill(butterflyColor.levels[0], butterflyColor.levels[1], butterflyColor.levels[2], b.alpha);
+        p.fill(butterflyColor.levels[0], butterflyColor.levels[1],
+               butterflyColor.levels[2], b.alpha);
         p.noStroke();
         p.ellipse(b.size * 0.3, 0, b.size, b.size * 0.6);
         p.pop();
@@ -353,8 +326,8 @@ export const RainyCanvas: React.FC = () => {
           drops.push(new RainDrop());
         }
 
-        // Create grid
-        createGrid();
+        // Initialize height map
+        initHeightMap();
       };
 
       p.draw = () => {
@@ -362,8 +335,8 @@ export const RainyCanvas: React.FC = () => {
 
         switch(phase) {
           case 'raining':
-            // Draw grid
-            drawGrid();
+            // Draw stacked chars first (background)
+            drawStackedChars();
 
             // Update and display rain drops
             for (let drop of drops) {
@@ -371,31 +344,84 @@ export const RainyCanvas: React.FC = () => {
               drop.display();
             }
 
-            // Check if ready to transform
-            if (checkTransformReady()) {
-              transformToButterflies();
-              phase = 'transforming';
+            // Increment timer
+            rainingTimer++;
+
+            // Debug: Log timer every second
+            if (rainingTimer % 60 === 0) {
+              console.log(`Raining timer: ${rainingTimer} frames (${rainingTimer/60} seconds)`);
+              console.log(`Current phase: ${phase}`);
+              console.log(`Stacked chars: ${stackedChars.length}`);
+            }
+
+            // Check if should stop (10 seconds = 600 frames at 60fps, OR height threshold)
+            if (rainingTimer >= 600 || checkStopRain()) {
+              console.log(`STOPPING RAIN - Timer: ${rainingTimer}, Height check: ${checkStopRain()}`);
+              phase = 'stopping';
+              stoppingTimer = 0;
             }
             break;
 
-          case 'transforming':
+          case 'stopping':
+            // Draw stacked chars
+            drawStackedChars();
+
+            // Continue updating existing drops
+            for (let drop of drops) {
+              drop.update();
+              if (drop.y > -100) { // Only show drops that are visible
+                drop.display();
+              }
+            }
+
+            // Wait for all drops to clear
+            stoppingTimer++;
+            const allDropsGone = drops.every(d => d.y > p.height + 50 || d.y < -100);
+
+            // Debug
+            if (stoppingTimer % 30 === 0) {
+              console.log(`STOPPING phase - Timer: ${stoppingTimer}, All drops gone: ${allDropsGone}`);
+            }
+
+            if (allDropsGone && stoppingTimer > 30) { // Wait 30 frames after clear
+              console.log(`ENTERING BUTTERFLIES PHASE`);
+              phase = 'butterflies';
+              butterflySpawnRate = 0.005;
+              butterflyTimer = 0;
+            }
+            break;
+
+          case 'butterflies':
+            // Draw stacked chars (fading)
+            drawStackedChars();
+
+            // Gradually fade all stacked chars
+            for (const char of stackedChars) {
+              char.targetAlpha -= 0.5;
+            }
+
+            // Spawn butterflies with acceleration
+            butterflyTimer++;
+            butterflySpawnRate *= 1.03; // Accelerate spawn rate
+
+            // Debug
+            if (butterflyTimer % 60 === 0) {
+              console.log(`BUTTERFLIES phase - Timer: ${butterflyTimer}, Spawn rate: ${butterflySpawnRate.toFixed(4)}, Butterflies: ${butterflies.length}, Stacked: ${stackedChars.length}`);
+            }
+
+            if (p.random() < butterflySpawnRate && stackedChars.length > 0) {
+              spawnButterfly();
+            }
+
             // Update and draw butterflies
             updateButterflies();
             for (const b of butterflies) {
               drawButterfly(b);
             }
 
-            // Fade out rain drops
-            for (let drop of drops) {
-              drop.update();
-              drop.alpha = p.max(drop.alpha - 2, 0);
-              if (drop.alpha > 0) {
-                drop.display();
-              }
-            }
-
-            // Check if all butterflies gone
-            if (butterflies.length === 0) {
+            // Transition to resetting when chars and butterflies gone
+            if (stackedChars.length === 0 && butterflies.length === 0 && butterflyTimer > 180) {
+              console.log(`ENTERING RESETTING PHASE`);
               phase = 'resetting';
             }
             break;
@@ -412,9 +438,12 @@ export const RainyCanvas: React.FC = () => {
               drop.display();
             }
 
-            // When all drops restored, return to raining
+            // When all drops restored, reset and return to raining
             if (allRestored) {
               phase = 'raining';
+              rainingTimer = 0; // Reset timer
+              initHeightMap();
+              stackedChars = [];
             }
             break;
         }
@@ -426,7 +455,7 @@ export const RainyCanvas: React.FC = () => {
             containerRef.current.clientWidth,
             containerRef.current.clientHeight
           );
-          createGrid(); // Recreate grid on resize
+          initHeightMap();
         }
       };
     };
