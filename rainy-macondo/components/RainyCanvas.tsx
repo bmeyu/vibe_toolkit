@@ -28,8 +28,9 @@ export const RainyCanvas: React.FC = () => {
       let butterflyTimer = 0;
 
       // Phase management
-      type Phase = 'raining' | 'stopping' | 'butterflies' | 'resetting';
+      type Phase = 'raining' | 'slowingDown' | 'stopping' | 'butterflies';
       let phase: Phase = 'raining';
+      let slowingTimer = 0;
       let stoppingTimer = 0;
       let rainingTimer = 0; // Timer for automatic rain stop
 
@@ -112,8 +113,8 @@ export const RainyCanvas: React.FC = () => {
           return this.word.length > 0 ? this.word[0] : '';
         }
 
-        update() {
-          this.y += this.speed;
+        update(speedMultiplier = 1) {
+          this.y += this.speed * speedMultiplier;
 
           // Check for stacking (only in raining phase)
           // Start checking earlier for better stacking detection
@@ -124,8 +125,8 @@ export const RainyCanvas: React.FC = () => {
             }
           }
 
-          // Reset when off screen (only in raining phase)
-          if (phase === 'raining' && this.y > p.height + 50) {
+          // Reset when off screen (only in raining and slowingDown phases)
+          if ((phase === 'raining' || phase === 'slowingDown') && this.y > p.height + 50) {
             this.reset();
           }
         }
@@ -260,22 +261,31 @@ export const RainyCanvas: React.FC = () => {
         return stackHeight >= p.height * 0.25; // Stop when quarter screen filled (faster)
       }
 
-      // Spawn butterflies gradually
+      // Spawn butterflies from center point (blooming effect)
       function spawnButterfly() {
         if (stackedWords.length === 0) return;
 
-        // Pick random stacked word
-        const wordIndex = Math.floor(p.random(stackedWords.length));
-        const item = stackedWords[wordIndex];
+        // Find the lowest stacked word (center of the mountain)
+        let lowestY = 0;
+        let centerX = p.width / 2;
+        let centerY = p.height;
 
+        for (const item of stackedWords) {
+          if (item.y < centerY) {
+            centerY = item.y;
+            centerX = item.x;
+          }
+        }
+
+        // Burst from center point in all directions
         const angle = p.random(p.TWO_PI);
-        const speed = p.random(1, 3);
+        const speed = p.random(2, 4); // Faster burst
 
         butterflies.push({
-          x: item.x,
-          y: item.y,
+          x: centerX,
+          y: centerY,
           vx: p.cos(angle) * speed,
-          vy: p.sin(angle) * speed - 1, // Bias upward
+          vy: p.sin(angle) * speed - 1.5, // Stronger upward bias
           wingPhase: p.random(p.TWO_PI),
           wingSpeed: p.random(0.1, 0.2),
           size: p.random(12, 20),
@@ -374,8 +384,32 @@ export const RainyCanvas: React.FC = () => {
             // Increment timer
             rainingTimer++;
 
-            // Check if should stop (10 seconds = 600 frames at 60fps, OR height threshold)
-            if (rainingTimer >= 600 || checkStopRain()) {
+            // Check if should start slowing down (9 seconds = 540 frames at 60fps, OR height threshold)
+            if (rainingTimer >= 540 || checkStopRain()) {
+              phase = 'slowingDown';
+              slowingTimer = 0;
+            }
+            break;
+
+          case 'slowingDown':
+            // Draw stacked words first (background)
+            drawStackedWords();
+
+            // Calculate slowdown factor (gradually reduce speed over 2 seconds)
+            // slowingTimer 0-120: factor goes from 1.0 to 0.0
+            const slowdownFactor = Math.max(0, 1 - (slowingTimer / 120));
+
+            // Update and display rain drops with slowdown
+            for (let drop of drops) {
+              drop.update(slowdownFactor);
+              drop.display();
+            }
+
+            // Increment timer
+            slowingTimer++;
+
+            // After 2 seconds of slowing down (120 frames), freeze completely
+            if (slowingTimer >= 120) {
               phase = 'stopping';
               stoppingTimer = 0;
             }
@@ -385,21 +419,20 @@ export const RainyCanvas: React.FC = () => {
             // Draw stacked words
             drawStackedWords();
 
-            // Continue updating existing drops
+            // Freeze all drops - display but don't update
+            // Only show drops that are on screen
             for (let drop of drops) {
-              drop.update();
-              if (drop.y > -100) { // Only show drops that are visible
+              if (drop.y >= -100 && drop.y <= p.height + 100) {
                 drop.display();
               }
             }
 
-            // Wait for all drops to clear
+            // Short pause with frozen rain
             stoppingTimer++;
-            const allDropsGone = drops.every(d => d.y > p.height + 50 || d.y < -100);
 
-            if (allDropsGone && stoppingTimer > 30) { // Wait 30 frames after clear
+            if (stoppingTimer > 60) { // Wait 1 second (60 frames)
               phase = 'butterflies';
-              butterflySpawnRate = 0.005;
+              butterflySpawnRate = 0.01; // Start slow for blooming effect
               butterflyTimer = 0;
             }
             break;
@@ -413,9 +446,9 @@ export const RainyCanvas: React.FC = () => {
               item.targetAlpha -= 0.5;
             }
 
-            // Spawn butterflies with acceleration
+            // Spawn butterflies with acceleration (blooming effect)
             butterflyTimer++;
-            butterflySpawnRate *= 1.03; // Accelerate spawn rate
+            butterflySpawnRate *= 1.05; // Faster acceleration for dramatic burst
 
             if (p.random() < butterflySpawnRate && stackedWords.length > 0) {
               spawnButterfly();
