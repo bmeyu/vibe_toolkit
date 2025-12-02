@@ -44,6 +44,8 @@ export const RainyCanvas: React.FC = () => {
         lit: boolean;
         brightness: number;
         glowPhase: number;
+        jitterX: number;  // Random offset for natural look
+        jitterY: number;
       }
 
       interface Butterfly {
@@ -57,6 +59,14 @@ export const RainyCanvas: React.FC = () => {
         alpha: number;
       }
 
+      // Gaussian random number generator (Box-Muller transform)
+      function gaussianRandom(mean: number, stdDev: number): number {
+        const u1 = p.random();
+        const u2 = p.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        return mean + z * stdDev;
+      }
+
       class RainDrop {
         x: number;
         y: number;
@@ -67,11 +77,18 @@ export const RainyCanvas: React.FC = () => {
         alpha: number;
 
         constructor(startRandomY = true) {
-          this.x = p.random(p.width);
+          // Use Gaussian distribution for x position (center-weighted)
+          this.x = gaussianRandom(p.width / 2, p.width / 4);
+          this.x = p.constrain(this.x, 0, p.width);
+
           this.y = startRandomY ? p.random(-p.height, p.height) : p.random(-500, -50);
           this.z = p.random(0.5, 2);
-          this.speed = p.map(this.z, 0.5, 2, 1, 3.5);
-          this.textSize = p.map(this.z, 0.5, 2, 12, 28);
+
+          // Add random speed variation
+          const baseSpeed = p.map(this.z, 0.5, 2, 1, 3.5);
+          this.speed = baseSpeed * p.random(0.7, 1.3);
+
+          this.textSize = p.map(this.z, 0.5, 2, 10, 24); // Reduced from 12-28 to 10-24
           this.alpha = p.map(this.z, 0.5, 2, 120, 255);
           this.pickChar();
         }
@@ -103,7 +120,9 @@ export const RainyCanvas: React.FC = () => {
 
         reset() {
           this.y = p.random(-200, -50);
-          this.x = p.random(p.width);
+          // Use Gaussian distribution for reset position too
+          this.x = gaussianRandom(p.width / 2, p.width / 4);
+          this.x = p.constrain(this.x, 0, p.width);
           this.pickChar();
         }
 
@@ -141,7 +160,9 @@ export const RainyCanvas: React.FC = () => {
               row, col,
               lit: false,
               brightness: 0,
-              glowPhase: p.random(p.TWO_PI)
+              glowPhase: p.random(p.TWO_PI),
+              jitterX: p.random(-2, 2),  // Random horizontal offset
+              jitterY: p.random(-1, 1)   // Random vertical offset
             });
           }
           grid.push(rowCells);
@@ -185,6 +206,9 @@ export const RainyCanvas: React.FC = () => {
         p.textFont('Georgia');
         p.textAlign(p.CENTER, p.BOTTOM);
 
+        // Soaked (stacked) text color - darker than falling rain
+        const soakedColor = p.color(140, 160, 180);
+
         for (const row of grid) {
           for (const cell of row) {
             // Update brightness
@@ -196,12 +220,16 @@ export const RainyCanvas: React.FC = () => {
               // Glow effect
               cell.glowPhase += 0.02;
               const glow = p.sin(cell.glowPhase) * 0.15 + 0.85;
-              const alpha = cell.brightness * 255 * glow;
+
+              // Reduced opacity for soaked/old text (40-60%)
+              const alpha = cell.brightness * 150 * glow;
 
               p.noStroke();
-              p.fill(rainColor.levels[0], rainColor.levels[1], rainColor.levels[2], alpha);
-              p.textSize(18);
-              p.text(cell.char, cell.x, cell.y);
+              p.fill(soakedColor.levels[0], soakedColor.levels[1], soakedColor.levels[2], alpha);
+              p.textSize(16); // Reduced from 18 to 16
+
+              // Apply jitter offset for organic look
+              p.text(cell.char, cell.x + cell.jitterX, cell.y + cell.jitterY);
             }
           }
         }
@@ -345,9 +373,7 @@ export const RainyCanvas: React.FC = () => {
 
             // Check if ready to transform
             if (checkTransformReady()) {
-              console.log('Transforming to butterflies!');
               transformToButterflies();
-              console.log(`Created ${butterflies.length} butterflies`);
               phase = 'transforming';
             }
             break;
