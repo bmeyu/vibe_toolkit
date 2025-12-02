@@ -20,7 +20,7 @@ export const RainyCanvas: React.FC = () => {
       // Natural stacking system
       let stackedChars: StackedChar[] = [];
       let heightMap: number[] = []; // Height at each x position
-      const GRID_SIZE = 5; // Pixel grid for height tracking
+      const GRID_SIZE = 15; // Pixel grid for height tracking (larger for better stacking)
 
       // Butterflies
       let butterflies: Butterfly[] = [];
@@ -115,7 +115,8 @@ export const RainyCanvas: React.FC = () => {
           this.y += this.speed;
 
           // Check for stacking (only in raining phase)
-          if (phase === 'raining' && this.y > p.height - 100) {
+          // Start checking earlier for better stacking detection
+          if (phase === 'raining' && this.y > p.height - 200) {
             if (checkStacking(this)) {
               this.reset();
               return;
@@ -176,24 +177,33 @@ export const RainyCanvas: React.FC = () => {
 
         const currentHeight = heightMap[gridX];
 
-        // Check if drop reached stacking height
-        if (drop.y >= currentHeight - 5) {
+        // Check if drop reached stacking height (larger detection range)
+        if (drop.y >= currentHeight - 15) {
           // Add to stacked chars
-          const jitterX = p.random(-2, 2);
-          const jitterY = p.random(-1, 1);
+          const jitterX = p.random(-3, 3);
+          const jitterY = p.random(-2, 2);
 
           stackedChars.push({
             x: drop.x + jitterX,
             y: currentHeight + jitterY,
             char: drop.char,
-            size: drop.textSize * 0.7,
-            alpha: 150,
-            targetAlpha: 150,
+            size: drop.textSize * 0.9, // Keep size closer to original
+            alpha: 200, // Brighter for visibility
+            targetAlpha: 200,
             glowPhase: p.random(p.TWO_PI)
           });
 
-          // Update height map
-          heightMap[gridX] -= drop.textSize * 0.7;
+          // Update height map - also update neighboring cells for wider stacking
+          const charHeight = drop.textSize * 0.9;
+          heightMap[gridX] -= charHeight;
+
+          // Update adjacent cells for smoother mountain shape
+          if (gridX > 0) {
+            heightMap[gridX - 1] -= charHeight * 0.5;
+          }
+          if (gridX < heightMap.length - 1) {
+            heightMap[gridX + 1] -= charHeight * 0.5;
+          }
 
           return true;
         }
@@ -423,6 +433,9 @@ export const RainyCanvas: React.FC = () => {
             if (stackedChars.length === 0 && butterflies.length === 0 && butterflyTimer > 180) {
               console.log(`ENTERING RESETTING PHASE`);
               phase = 'resetting';
+              // Clear everything immediately when entering resetting phase
+              stackedChars = [];
+              initHeightMap();
             }
             break;
 
@@ -438,12 +451,10 @@ export const RainyCanvas: React.FC = () => {
               drop.display();
             }
 
-            // When all drops restored, reset and return to raining
+            // When all drops restored, return to raining
             if (allRestored) {
               phase = 'raining';
               rainingTimer = 0; // Reset timer
-              initHeightMap();
-              stackedChars = [];
             }
             break;
         }
