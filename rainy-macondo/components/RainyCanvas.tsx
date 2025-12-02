@@ -79,6 +79,8 @@ export const RainyCanvas: React.FC = () => {
         textSize: number;
         word: string; // Changed from char to word
         alpha: number;
+        baseAlpha: number; // Store original alpha for restoration
+        fadeOut: boolean; // Whether this drop should fade out during slowdown
 
         constructor(startRandomY = true) {
           // Gaussian distribution for center-weighted position
@@ -95,6 +97,8 @@ export const RainyCanvas: React.FC = () => {
           // Smaller text size
           this.textSize = p.map(this.z, 0.5, 2, 6, 12); // Reduced from 10-24 to 6-12
           this.alpha = p.map(this.z, 0.5, 2, 120, 255);
+          this.baseAlpha = this.alpha;
+          this.fadeOut = false; // Will be set when slowing down starts
           this.pickWord();
         }
 
@@ -392,6 +396,13 @@ export const RainyCanvas: React.FC = () => {
             break;
 
           case 'slowingDown':
+            // First frame: mark 70% of drops to fade out
+            if (slowingTimer === 0) {
+              for (let drop of drops) {
+                drop.fadeOut = p.random() < 0.7; // 70% chance to fade out
+              }
+            }
+
             // Draw stacked words first (background)
             drawStackedWords();
 
@@ -402,7 +413,16 @@ export const RainyCanvas: React.FC = () => {
             // Update and display rain drops with slowdown
             for (let drop of drops) {
               drop.update(slowdownFactor);
-              drop.display();
+
+              // Gradually fade out marked drops
+              if (drop.fadeOut) {
+                drop.alpha = drop.baseAlpha * slowdownFactor;
+              }
+
+              // Only display if still visible
+              if (drop.alpha > 5) {
+                drop.display();
+              }
             }
 
             // Increment timer
