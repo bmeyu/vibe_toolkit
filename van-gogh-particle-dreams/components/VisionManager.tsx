@@ -143,7 +143,7 @@ const VisionManager: React.FC<VisionManagerProps> = ({ onHandUpdate }) => {
          if (results.landmarks) {
             for (const landmarks of results.landmarks) {
               drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS);
-              drawingUtils.drawLandmarks(landmarks, { color: gesture === GestureType.CLOSED_FIST ? "#FF0000" : "#00FF00", radius: 3 });
+              drawingUtils.drawLandmarks(landmarks, { color: gesture === GestureType.CLOSED_FIST ? "#FF0000" : "#FFFFFF", radius: 3 });
             }
          }
        }

@@ -106,7 +106,7 @@ const App: React.FC = () => {
       {/* 3D Scene */}
       <div className="absolute inset-0 z-0">
         <Canvas camera={{ position: [0, 0, 25], fov: 45 }}>
-          <color attach="background" args={['#050505']} />
+          <color attach="background" args={['#000000']} />
           <ambientLight intensity={0.5} />
           {/* Particles Component handles the logic */}
           <Particles 
@@ -123,13 +123,13 @@ const App: React.FC = () => {
         
         {/* Header */}
         <div className="flex flex-col items-start space-y-2">
-            <h1 className="text-4xl md:text-6xl font-['Cinzel'] text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-300 to-yellow-600 drop-shadow-lg">
-                VAN GOGH DREAMS
+            <h1 className="text-4xl md:text-6xl font-['Lato'] font-light text-white drop-shadow-lg">
+                viberx360.com
             </h1>
             <div className="flex items-center space-x-2">
-                 <div className="h-px w-12 bg-white/30"></div>
-                 <p className="text-white/60 text-sm font-['Lato'] tracking-widest uppercase">
-                    Interactive Particle System
+                 <div className="h-px w-12 bg-white/20"></div>
+                 <p className="text-gray-400 text-sm font-['Lato'] tracking-widest">
+                    智简 AI 简历构建器 - 为每个机会量身定制
                  </p>
             </div>
         </div>
@@ -147,8 +147,8 @@ const App: React.FC = () => {
         {/* Footer / Instructions */}
         <div className="flex flex-col items-center justify-center w-full">
             <div className={`px-6 py-3 rounded-full backdrop-blur-md border border-white/10 transition-all duration-300 ${
-                handData.gesture === GestureType.CLOSED_FIST 
-                ? 'bg-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.3)]' 
+                handData.gesture === GestureType.CLOSED_FIST
+                ? 'bg-white/20 shadow-[0_0_30px_rgba(255,255,255,0.3)]'
                 : 'bg-white/5'
             }`}>
                 <p className="text-white text-sm md:text-base font-['Lato'] tracking-wide">
@@ -158,11 +158,11 @@ const App: React.FC = () => {
             
             <div className="mt-4 flex space-x-8 text-[10px] text-white/40 uppercase tracking-widest">
                 <div className="flex items-center space-x-2">
-                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                    <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                     <span>Open Hand: Swirl</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                    <span className="w-2 h-2 rounded-full bg-gray-500"></span>
                     <span>Close Fist: Transform</span>
                 </div>
             </div>
