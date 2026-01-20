@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vortex Particle Bloom</title>
+  <link rel="icon" href="data:," />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div class="ui">
+    <div class="title">Starry Night Flow</div>
+    <div class="subtitle">Multi-vortex flow field · 6,200 trails · Audio reactive</div>
+  </div>
+  <div class="audio-controls">
+    <label class="audio-file">
+      <input type="file" id="audioFile" accept="audio/*" />
+      <span>Load Audio</span>
+    </label>
+    <button id="playBtn" type="button">Play</button>
+    <button id="micBtn" type="button">Mic</button>
+    <div class="audio-status" id="audioStatus">No audio</div>
+    <div class="audio-meter">
+      <span id="audioMeter"></span>
+    </div>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

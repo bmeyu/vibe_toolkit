@@ -1,0 +1,139 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #000000;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: rgba(240, 240, 245, 0.78);
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+.ui {
+  position: fixed;
+  left: 32px;
+  top: 28px;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.title {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.subtitle {
+  margin-top: 8px;
+  font-size: 0.6rem;
+  color: rgba(255, 222, 160, 0.7);
+}
+
+.audio-controls {
+  position: fixed;
+  left: 28px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(5, 8, 18, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.audio-file {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  color: rgba(240, 240, 245, 0.82);
+}
+
+.audio-file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.audio-controls button {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: rgba(240, 240, 245, 0.82);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+}
+
+.audio-controls button:hover,
+.audio-file:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.audio-status {
+  color: rgba(255, 255, 255, 0.6);
+  min-width: 120px;
+}
+
+.audio-meter {
+  width: 120px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.audio-meter span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0.05);
+  background: linear-gradient(90deg, #ffd37a, #e6f0ff);
+}
+
+@media (max-width: 720px) {
+  .ui {
+    left: 16px;
+    top: 16px;
+  }
+
+  .audio-controls {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .audio-status {
+    min-width: auto;
+  }
+}
